@@ -1,0 +1,14 @@
+# requirements.txt
+# Python dependencies for the weather pipeline.
+# Installed by GitHub Actions before running the pipeline (Step 7).
+
+# HTTP requests — used in fetch.py to call the Open-Meteo API
+requests>=2.31
+
+# Loads environment variables from a local .env file during development,
+# so GROQ_API_KEY can be set without hardcoding it in any script.
+# In GitHub Actions the secret is injected directly, so dotenv is only active locally.
+python-dotenv>=1.0
+
+# Groq Python client — used in generate_dashboard.py to generate the bilingual poem
+groq>=0.5

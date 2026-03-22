@@ -1,0 +1,72 @@
+# .github/workflows/weather_pipeline.yml
+# Assignment Step 7: Automate the pipeline with GitHub Actions.
+# This workflow runs the full pipeline automatically on a daily schedule,
+# following the same structure as news_pipeline.yml from Lecture 3+4.
+
+name: Weather Pipeline
+
+on:
+  # Allow manual triggering from the Actions tab — useful for testing
+  workflow_dispatch:
+
+  schedule:
+    # Run every day at 20:00 Danish time (CET = UTC+1, CEST = UTC+2).
+    # GitHub Actions cron uses UTC, so we use 19:00 UTC to hit 20:00 CET (winter).
+    # In summer (CEST, UTC+2) this will fire at 21:00 local — acceptable given
+    # the assignment deadline is 20:00 and the schedule is best-effort.
+    - cron: "0 19 * * *"
+
+# Allow the workflow to commit and push the updated dashboard back to the repo
+permissions:
+  contents: write
+
+jobs:
+  run-weather-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository so the runner has access to all our scripts
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python 3.11 (same version as Lecture 3 workflow)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"  # Cache pip dependencies to speed up subsequent runs
+
+      # Step 3: Install all Python dependencies from requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Run the full pipeline (fetch → store → generate dashboard)
+      # The GROQ_API_KEY is injected from the GitHub repository secret we added earlier.
+      # It is never exposed in logs or the codebase — GitHub masks it automatically.
+      - name: Run pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python run_pipeline.py
+
+      # Step 5: Commit and push the updated docs/index.html and weather.db back to main.
+      # This is what triggers GitHub Pages to serve the fresh content (Step 8).
+      # We check for actual changes first to avoid empty commits on days with no new data.
+      - name: Commit and push updated dashboard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage the database and the generated dashboard page
+          mkdir -p data docs
+          git add data/weather.db docs/index.html
+
+          # Only commit if there are actual changes — avoids noisy empty commits
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update weather forecast and dashboard"
+            git push
+          fi
